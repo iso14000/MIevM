@@ -19,3 +19,6 @@
 //TODO => add a Peukert law
 //TODO => add a compilation switch to activate Voltage filter (CMU failure filter)
 //TODO => not a small piece , add a RS232 to monitor / configure features.... 
+
+![2356-f2dc6ea27cf599fa2192ae4c08f08950](https://github.com/user-attachments/assets/1103d7ac-ac8a-44a7-8370-22248550f207)
+

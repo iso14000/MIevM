@@ -1,0 +1,3 @@
+//V0.1 first test in the car OK => range is 253Km
+//V0.2 cleanup from Dala's software (Leaf battery pack upgrade) and SoCx clamping [0..100%] ; 
+//quickly valdated on my car, report correctly Soc vs Voltage, range decrease while driving, 

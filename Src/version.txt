@@ -1,3 +1,4 @@
 //V0.1 first test in the car OK => range is 253Km
 //V0.2 cleanup from Dala's software (Leaf battery pack upgrade) and SoCx clamping [0..100%] ; 
 //quickly valdated on my car, report correctly Soc vs Voltage, range decrease while driving, 
+//V0.3 now MIevM is connected on P12V (permanent 12V) , so sleep mode is activated after a delay (20s for instance)

@@ -2,6 +2,9 @@ disclamer.
 
  FSI code from original one PIEV MIM Imiev CATL93 upgrade., platform Arduino Due + CAN shield 
  the actual structure of this project comes from "Dala the great" , mod for LEAF battery swap 
+
+ Board used for MIevM, is a "MB CAN STM32" or "MB Filter", also known to fool odometer (for bad reason 99% of time) , it is very cheap and affordable.
+ Take care to buy only the stm32f105RBT06. PCB is genarally blue.
  
  FSI is my trigram , my first name is Florent , I add "FSI" each time I modify something to keep track of the mod.
 until Version revision is V0.x , it is NOT fully tested (not easy to perform!) actually the car is drivable and range reported
@@ -17,6 +20,7 @@ is 254Km (in theory I don't swapped my pack yet), and that's all! Don't start ma
 V0.1 first test in the car OK => range is 253Km on combination meter , can be in "ready mode" , and can drive.
 
 V0.2 cleanup from Dala's software (Leaf battery pack upgrade) and SoCx clamping [0..100%] ; 
+V0.3 now MIevM is connected on P12V (permanent 12V) , so sleep mode is activated after a delay (20s for instance)
 
 quickly validated on my car, report correctly Soc vs Voltage, range decrease while driving, 
 

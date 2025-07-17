@@ -87,7 +87,7 @@ int main(void)
 				//HAL_GPIO_WritePin(LED_Port,LED,GPIO_PIN_RESET); //led On
 				//HAL_GPIO_WritePin(LED_Port,LED,GPIO_PIN_SET); //led off
 			
-				/*FSI => below lines are usefull to light / on light off the led (very fast ~40ns), perfect to trigger a scope
+				/*FSI => below lines are usefull to light on light off the led (very fast ~40ns), perfect to trigger a scope
 				LED_Port->BSRR = (uint32_t)LED << 16u; //reset pin (Led On) positive pulse of 40ns
 				LED_Port->BSRR = LED; //set pin (Led OFF)
 				*/
@@ -109,13 +109,13 @@ int main(void)
 							//Can bus is idle
 							idleTick++;
 							
-							/* => FSI removed below , but could be usefull because my board is on P+12V (permanent 12V)
-							if(idleTick > 5){ //No can messages for 5s
+							
+							if(idleTick > 20){ //No can messages for 20s
 								HAL_SuspendTick();
 								HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
 								HAL_ResumeTick();
 								idleTick = 0;
-							}*/ 
+							} 
 						}
         }
         

@@ -11,10 +11,11 @@
 
 //V0.1 first test in the car OK => range is 253Km on combination meter , can be in "ready mode" , and can drive.
 //V0.2 cleanup from Dala's software (Leaf battery pack upgrade) and SoCx clamping [0..100%] ; 
-//quickly valdated on my car, report correctly Soc vs Voltage, range decrease while driving, 
+//quickly valdated on my car, report correctly Soc vs Voltage, range decrease while driving,
+//V0.3 now MIevM is connected on P12V (permanent 12V) , so sleep mode is activated after a delay (20s for instance)
 
 
-//TODO take care of energy by activating the sleep feature.
+
 //TODO add a busbutton to force SoC2 vs voltage evaluation. (or anything else)
 //TODO => add a Peukert law
 //TODO => add a compilation switch to activate Voltage filter (CMU failure filter)
@@ -31,7 +32,7 @@
 #define CATL93_CAPACITY 90  //Battery Capacity in Ah
 #define VOLTAGE_OFFSET 210	// offset used for char to volt convertion 
 #define VOLT_TO_CHAR(value) (value*100-VOLTAGE_OFFSET) //macro to convert a voltage to a char /!\ check for overflow at compilation.
-#define TIME_REST_FOR_SOC_VOLTAGE_EVAL_MS 60000 //in x10ms here 10 min 
+#define TIME_REST_FOR_SOC_VOLTAGE_EVAL_MS 60000 // expresed  by x10ms ( 10 min  actually)
 #define CURRENT_FOR_SOC_VOLTAGE_EVAL 2.0 //in ampere
 #define VOLTAGE_LOWEST	2.75
 #define VOLTAGE_HIGHEST 4.2
@@ -50,8 +51,9 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 	float 	SoC2;        //State of Charge based either on battery voltage or coulomb counting
 	static char	 j = 0;      //Counter for valid data
 	static char flag = 0;   //power up flag
-	static long centiSec=0;  //Timer amps between -1 and 1
-
+	static long centiSec=0;  //Time when  amps between -CURRENT_FOR_SOC_VOLTAGE_EVAL and +CURRENT_FOR_SOC_VOLTAGE_EVAL
+														// based on 0x373 lessage recurrence.
+	
 	//static char vMax= 0;
 	static char vMin =VOLT_TO_CHAR(2.76) ; // and powerup , first voltage is initialized to the lowest possible
 																				 // it should be refreshed to a better value immediatly afterward.
@@ -94,7 +96,7 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 							{                      //YES!  we gonna initialize some few things
 								if (j++ >= 20) {              //wait 20 0x373 frames until CMU is providing good data
 									SoC2=storeSoC2(vMin);				//get battery SoC based on voltage (without current!)
-									remAh1 = (SoC2*CATL93_CAPACITY)/100;  //calculate the start remaining Ah in the battery based on voltage
+									remAh1 = (SoC2*CATL93_CAPACITY)/100;  //calculate the initial remaining Ah in the battery based on voltage
 									remAh2 = remAh1;  //calculate the start remaining Ah in the battery based on voltage
 									flag = 1;
 								}

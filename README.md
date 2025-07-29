@@ -26,7 +26,7 @@ quickly validated on my car, report correctly Soc vs Voltage, range decrease whi
 
 
 
-TODO take care of energy by activating the sleep feature.
+>>DONE : TODO take care of energy by activating the sleep feature.
 
 TODO add a busbutton to force SoC2 vs voltage evaluation. (or anything else)
 

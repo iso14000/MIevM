@@ -21,6 +21,10 @@ V0.1 first test in the car OK => range is 253Km on combination meter , can be in
 
 V0.2 cleanup from Dala's software (Leaf battery pack upgrade) and SoCx clamping [0..100%] ; 
 V0.3 now MIevM is connected on P12V (permanent 12V) , so sleep mode is activated after a delay (20s for instance)
+V0.4 added a NMC under temperature recharge inhibition. tested on bench only!
+				when temp goes below 5°C Vmax is puched to 4.2V, main effect is to forbid regular charging and regeneration
+		, changed "char" to "uint8_t" for clarity. Tested on bench, not "in car" ... we are almost burning in Toulouse :-\
+
 
 quickly validated on my car, report correctly Soc vs Voltage, range decrease while driving, 
 

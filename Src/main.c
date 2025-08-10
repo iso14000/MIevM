@@ -34,8 +34,11 @@ static uint8_t idleTick = 0;
 
 void SystemClock_Config(void);
 
+
+
 int main(void)
 {
+	 
 	
   /* USER CODE BEGIN 1 */
    CAN_FRAME frame;
@@ -93,9 +96,10 @@ int main(void)
 				*/
 			
 			
+				StateMachine(); //state machine management 
+				LedStateMachineUnderSampled(0);
 
-				
-			
+						
 			
         if(( HAL_GetTick() - last_tick ) >= 1000u )
         {
@@ -109,20 +113,21 @@ int main(void)
 							//Can bus is idle
 							idleTick++;
 							
-							
+						/*	
 							if(idleTick > 20){ //No can messages for 20s
+								LedStateMachine(LED_FORCE_OFF);
 								HAL_SuspendTick();
 								HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
 								HAL_ResumeTick();
 								idleTick = 0;
-							} 
+							} */
 						}
         }
         
         if( LenCan( MYCAN1, CAN_RX ) > 0 ) // buffer isn't empty?
         { 
 						
-						LED_Port->BSRR = (uint32_t)LED << 16u; //FSI=>reset pin (Led On) flag is on to monitor CPU load
+					//	LED_Port->BSRR = (uint32_t)LED << 16u; //FSI=>reset pin (Led On) flag is on to monitor CPU load
 					
 						idleTick = 0; //reset tick counter because of activity
             PopCan( MYCAN1, CAN_RX, &frame ); //copy the all buffer into frame
@@ -132,7 +137,7 @@ int main(void)
         
         if( LenCan( MYCAN2, CAN_RX ) > 0 )
         {   
-						LED_Port->BSRR = (uint32_t)LED << 16u; ////FSI=>reset pin (Led On) flag is on to monitor CPU load
+					//	LED_Port->BSRR = (uint32_t)LED << 16u; ////FSI=>reset pin (Led On) flag is on to monitor CPU load
 					
 						idleTick = 0;
             PopCan( MYCAN2, CAN_RX, &frame );
@@ -141,7 +146,7 @@ int main(void)
         }
 				
 			
-				LED_Port->BSRR = LED; //set pin (Led OFF) //FSI=>Led is on during can handler computation
+		//		LED_Port->BSRR = LED; //set pin (Led OFF) //FSI=>Led is on during can handler computation
 				sendCan( MYCAN1 );
         sendCan( MYCAN2 ); 
         

@@ -13,7 +13,9 @@
 //V0.2 cleanup from Dala's software (Leaf battery pack upgrade) and SoCx clamping [0..100%] ; 
 //quickly valdated on my car, report correctly Soc vs Voltage, range decrease while driving,
 //V0.3 now MIevM is connected on P12V (permanent 12V) , so sleep mode is activated after a delay (20s for instance)
-
+//V0.4 added a NMC under temperature recharge inhibition. tested on bench only!
+//				when temp goes below 5°C Vmax is puched to 4.2V, main effect is to forbid regular charging and regeneration
+//			, changed "char" to "uint8_t" for clarity.
 
 
 //TODO add a busbutton to force SoC2 vs voltage evaluation. (or anything else)
@@ -27,6 +29,9 @@
 #include <stdio.h>
 #include <string.h>
 
+//FSI local defines 
+#define mLEDON	LED_Port->BSRR = (uint32_t)LED << 16u; //reset pin (Led On) positive pulse of 40ns
+#define mLEDOFF	LED_Port->BSRR = LED; //set pin (Led OFF)
 
 // FSI => some usefull defines
 #define CATL93_CAPACITY 90  //Battery Capacity in Ah
@@ -41,21 +46,54 @@
 //float step;                //Current interval
 //long prevTime = millis();  //Time since last current calculation
 
+//sequencer state machine variables
+unsigned int OldEventTime1ms=0; //should be same type as uwTick
+unsigned int NextEventDelay1ms=0;
+enum{
+  InitialState=0,
+	StartUp,
+	NormalRun,
+	NoRegen,
+}SystemState;
+uint8_t		CurrentState=InitialState;
 
+unsigned int OldLedEventTime1ms=0; //should be same type as uwTick
+unsigned int NextLedEventDelay1ms=0;
+enum{
+	LedOffState=0,
+	LedOnState,
+	LedBlinkSlow,
+	LedBlinkOnce,
+	LedBlinkTwice,
+	LedBlinkQuick,
+	LedExecuteSeq
+}LedStates;
+uint8_t 	LedState=LedOffState;
+uint16_t LedPattern=0;
+
+
+#define REGEN_INHIBIT	1
+#define	NO_ACTION		0
+uint8_t CommandFlag=NO_ACTION;
+
+uint8_t TempMinCellArray	[8];
+
+uint8_t TestMinTemp(uint8_t );
+#define MIN_TEMP 55 //( 5°C)
 
 void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imiev only
 {
 	static float remAh1 = CATL93_CAPACITY;  //Capacity remaining in battery based on coulomb counting
 	static float remAh2 = CATL93_CAPACITY;  //Capacity remaining in battery based either on battery voltage or coulomb counting
-	float 	SoC1;        //State of Charge based on coulomb counting
-	float 	SoC2;        //State of Charge based either on battery voltage or coulomb counting
-	static char	 j = 0;      //Counter for valid data
-	static char flag = 0;   //power up flag
+	float 	SoC1;        //State of Charge based on coulomb counting "guess O metter"
+	float 	SoC2;        //State of Charge based either on battery voltage or coulomb counting "barregraph"
+	static uint8_t	 j = 0;      //Counter for valid data
+	static uint8_t flag = 0;   //power up flag
 	static long centiSec=0;  //Time when  amps between -CURRENT_FOR_SOC_VOLTAGE_EVAL and +CURRENT_FOR_SOC_VOLTAGE_EVAL
 														// based on 0x373 lessage recurrence.
-	
+	static uint8_t	IndexTemp=0;
 	//static char vMax= 0;
-	static char vMin =VOLT_TO_CHAR(2.76) ; // and powerup , first voltage is initialized to the lowest possible
+	static uint8_t vMin =VOLT_TO_CHAR(2.76) ; // and powerup , first voltage is initialized to the lowest possible
 																				 // it should be refreshed to a better value immediatly afterward.
 
 	//uint8_t blocked = 0; // temp local variable
@@ -102,8 +140,8 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 								}
 							}
 							
-						char ah = frame->data[2];  //store current bytes and calculate battery current
-						char al = frame->data[3];
+						uint8_t ah = frame->data[2];  //store current bytes and calculate battery current
+						uint8_t al = frame->data[3];
 						float amps = (ah * 256 + al - 32700) / 100.0;  //Use 32700 not 32768 32700 is the calibrated value
 						float Ah = amps / 360000.0;                         //Amphours to or from the battery in the 0.01 sec between 0x373 frames
 						remAh1 = remAh1 + Ah;             //update remaining amp hours based on Ah in or out of battery
@@ -116,7 +154,12 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 								} else {
 									centiSec = 0;
 								}
-						
+//___________________FSI /!\ just for test ... to test regen inhibition.
+						if (CommandFlag==REGEN_INHIBIT) 
+						{
+							frame->data[0] = VOLT_TO_CHAR(VOLTAGE_HIGHEST);
+						};
+//___________________ END //FSI /!\ just for test ... to test regen inhibition.
 						//frame->data[0] = vMax; // FSI => vMax never used elsewhere. 
 						//frame->data[1] = vMin; // FSI => keep original value to handle a potential failure
 				break;
@@ -151,7 +194,7 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 							remAh2 = (SoC2  * CATL93_CAPACITY)/100;  //correct remaining capacity based on voltage
 						} else 
 							{      //current has not been low, long enough to use the SoC based on voltage
-								SoC2 = (100.0 * remAh2) / CATL93_CAPACITY;    //correct SoC bsed on the remaining Ah
+								SoC2 = (100.0 * remAh2) / CATL93_CAPACITY;    //correct SoC based on the remaining Ah
 								if (SoC2>100) //clamp SoC2 value for real life
 									{
 										SoC2=100;
@@ -160,10 +203,14 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 									if (SoC2<0) SoC2=0; //clamp SoC2 value for real life
 							}
 					//modify data coming from BMU
-					frame->data[0] =(char) 2 * SoC1 + 10;
-					frame->data[1] =(char) 2 * SoC2 + 10;
+					frame->data[0] =(uint8_t) 2 * SoC1 + 10;
+					frame->data[1] =(uint8_t) 2 * SoC2 + 10;
 					
-					//Can1.sendFrame(incoming);  //send the corrected SoCs and the correct 100% capacity to the ECU
+					//filling min temperature array 
+					TempMinCellArray[IndexTemp++]= frame->data[5];
+					if (IndexTemp>7) IndexTemp=0;
+					
+					// FSI basic test if 	((frame->data[5])>50)	mLEDON else mLEDOFF;
 				
 				
 					//frame->data[0] = 90;// just for test
@@ -187,7 +234,7 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 
 
 //this function takes around 20µs in the actual configuration (25Mhz Xtal and PLL engaged)
-float storeSoC2(char VoltMin) {
+float storeSoC2(uint8_t VoltMin) {
   if (VoltMin < VOLT_TO_CHAR(2.75)) {
     return 0 ;
   } 
@@ -228,4 +275,156 @@ void one_second_ping( void )
 {
     //FSI=> removed legacy prog, but keep function for futur use     
 }
+
+				
+void  StateMachine() //state machine management
+{
+	switch (CurrentState)
+		{
+			case InitialState :
+				if (uwTick-OldEventTime1ms>=NextEventDelay1ms )
+					{
+				//next event name and timing is :
+				CurrentState=NormalRun;
+				OldEventTime1ms=uwTick; //should we inhibit IT during this operation?
+				NextEventDelay1ms=2000;//2s later
+				//action
+				LedState=LedBlinkQuick; //during warmup led is blinking quicky
+					}
+					break;
+				//_________________________________
+			
+			case NormalRun :
+				if (uwTick-OldEventTime1ms>=NextEventDelay1ms ){
+				//next event name and timing is :
+				OldEventTime1ms=uwTick; 
+				NextEventDelay1ms=1000;// re enter the state in 1s.
+				//action
+				LedState=LedBlinkSlow; //
+				if (!TestMinTemp(MIN_TEMP)){
+						CommandFlag=REGEN_INHIBIT; // no regen allowed
+						CurrentState=NoRegen; // go to noregen state
+						LedState=LedBlinkOnce;
+					}
+				}
+				break;
+				//_________________________________
+			case NoRegen :
+				if (uwTick-OldEventTime1ms>=NextEventDelay1ms ){
+				//next event name and timing is :
+				OldEventTime1ms=uwTick; 
+				NextEventDelay1ms=1000;//re enter the state in 1s.
+				//action
+				LedState=LedBlinkOnce; //
+				if (TestMinTemp(MIN_TEMP+2)){ /take car of hysteresis
+						CommandFlag=NO_ACTION; //  regen allowed
+						CurrentState=NormalRun; // go to normal run
+						LedState=LedBlinkSlow; //
+					}	
+				
+				}
+				break;
+		
+			default :
+			{
+				CurrentState=InitialState;
+				OldEventTime1ms=uwTick; //should we inhibit IT during this operation?
+				NextEventDelay1ms=1000;//1s later
+			}
+			break;
+			//_________________________________
+		}
+	}
+      
+void LedStateMachineUnderSampled (uint8_t LedOrder)
+{
+	static uint8_t TickUnderSAmple=0	; // variable toggled every 256ms based on uwTick 1ms timer
+	if ((!TickUnderSAmple)&& (uwTick & (uint32_t)128) ) //L=>H edge detection
+	{
+		LedStateMachine(LedOrder);
+		TickUnderSAmple=1;
+	}
+	else 
+		if ( (TickUnderSAmple) && !(uwTick & (uint32_t)128) )//H=>L edge detection
+		{
+			LedStateMachine(LedOrder);
+			TickUnderSAmple=0;
+		}
+}
+	
+void 	LedStateMachine(uint8_t LedOrder) //LED state machine management called ~128ms by LedStateMachineUnderSampled
+{
+	
+	static uint8_t LastLedState =0;
+	if (LedOrder==LED_FORCE_OFF)  LedState=LedOffState;
+	if (LastLedState!=LedState)  //something change?
+	{
+			LastLedState=LedState;
+			switch (LedState)
+				{
+						case LedOffState :
+						mLEDOFF
+						LedPattern=0x0000;
+						break;
+						
+						case LedOnState :
+						LedPattern=0xFFFF;
+						mLEDON
+						break;
+						
+						case LedBlinkSlow :
+							LedPattern=0xF0F0;
+						break;
+						
+						case LedBlinkOnce :
+							LedPattern=0x0001;
+						break;
+						
+						case LedBlinkTwice :
+							LedPattern=0x000A;
+						break;
+
+						
+						case LedBlinkQuick :
+							LedPattern=0xAAAA;
+						break;
+						
+						default :
+						LedPattern=0x0000;
+						mLEDOFF
+						break;
+					}
+				}
+						
+				
+			if (LedPattern&0x0001)
+			{
+				LedPattern=LedPattern>>1;
+				LedPattern=LedPattern+0x8000;
+				mLEDON;
+			}
+			else 
+			{
+				mLEDOFF;
+				LedPattern=LedPattern>>1;
+			}
+						
+			
+} 
+
+uint8_t TestMinTemp(uint8_t Temperature2Compare)
+{
+	uint8_t i=0;
+	uint8_t AccumulativeFilter=0;
+	do 
+	{
+		if (TempMinCellArray[i++]<=Temperature2Compare)
+			AccumulativeFilter++;
+		if (AccumulativeFilter>=6)
+			return 0; // a cell is critically too cold => no regen requested!
+	}while (i<8);
+	return 1; // no cells under critical temp 
+}
+
+//wip 
 //____________________________________end ____________________________________

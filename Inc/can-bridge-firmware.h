@@ -7,6 +7,11 @@
 void one_second_ping( void );
 
 void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame);
-float storeSoC2(char VoltMin);
+float storeSoC2(uint8_t VoltMin);
 
+void  StateMachine(); //state machine management
+void 	LedStateMachine(uint8_t); // state machine for Led manadgment
+void 	LedStateMachineUnderSampled(uint8_t);
+
+#define LED_FORCE_OFF 255
 #endif

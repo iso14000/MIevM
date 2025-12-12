@@ -36,6 +36,8 @@ TODO add a busbutton to force SoC2 vs voltage evaluation. (or anything else)
 
 TODO => add a Peukert law
 
+
+
 TODO => add a compilation switch to activate Voltage filter (CMU failure filter)
 
 TODO => not a small piece , add a RS232 to monitor / configure features.... 
@@ -43,3 +45,8 @@ TODO => not a small piece , add a RS232 to monitor / configure features....
 
 ![2356-f2dc6ea27cf599fa2192ae4c08f08950](https://github.com/user-attachments/assets/1103d7ac-ac8a-44a7-8370-22248550f207)
 
+//V0.4 added a NMC under temperature recharge inhibition. tested on bench only!
+//				when temp goes below 5°C Vmax is pusched to 4.2V, main effect is to forbid regular charging and regeneration
+//			, changed "char" to "uint8_t" for clarity.
+//V0.5 WIP voltage for inhibit regen is now more 4.2 but 4.15V (bug report from Janka)
+//V0.6 WIP voltage for inhibit regen is now more 4.09V but 4.09 (MickeyS70 request)

@@ -14,9 +14,10 @@
 //quickly valdated on my car, report correctly Soc vs Voltage, range decrease while driving,
 //V0.3 now MIevM is connected on P12V (permanent 12V) , so sleep mode is activated after a delay (20s for instance)
 //V0.4 added a NMC under temperature recharge inhibition. tested on bench only!
-//				when temp goes below 5°C Vmax is puched to 4.2V, main effect is to forbid regular charging and regeneration
+//				when temp goes below 5°C Vmax is pusched to 4.2V, main effect is to forbid regular charging and regeneration
 //			, changed "char" to "uint8_t" for clarity.
-
+//V0.5 WIP voltage for inhibit regen is now more 4.2 but 4.15V (bug report from Janka)
+//V0.6 WIP voltage for inhibit regen is now more 4.09V but 4.09 (MickeyS70 request)
 
 //TODO add a busbutton to force SoC2 vs voltage evaluation. (or anything else)
 //TODO => add a Peukert law
@@ -41,6 +42,7 @@
 #define CURRENT_FOR_SOC_VOLTAGE_EVAL 2.0 //in ampere
 #define VOLTAGE_LOWEST	2.75
 #define VOLTAGE_HIGHEST 4.2
+#define	VOLTAGE_FOR_REGEN_DISABLE 4.09
 
 //long presTime;             //Time in milliseconds
 //float step;                //Current interval
@@ -157,7 +159,7 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 //___________________FSI /!\ just for test ... to test regen inhibition.
 						if (CommandFlag==REGEN_INHIBIT) 
 						{
-							frame->data[0] = VOLT_TO_CHAR(VOLTAGE_HIGHEST);
+							frame->data[0] = VOLT_TO_CHAR(VOLTAGE_FOR_REGEN_DISABLE);
 						};
 //___________________ END //FSI /!\ just for test ... to test regen inhibition.
 						//frame->data[0] = vMax; // FSI => vMax never used elsewhere. 
@@ -316,7 +318,7 @@ void  StateMachine() //state machine management
 				NextEventDelay1ms=1000;//re enter the state in 1s.
 				//action
 				LedState=LedBlinkOnce; //
-				if (TestMinTemp(MIN_TEMP+2)){ /take car of hysteresis
+				if (TestMinTemp(MIN_TEMP+2)){ //take car of hysteresis
 						CommandFlag=NO_ACTION; //  regen allowed
 						CurrentState=NormalRun; // go to normal run
 						LedState=LedBlinkSlow; //

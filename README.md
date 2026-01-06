@@ -50,3 +50,8 @@ TODO => not a small piece , add a RS232 to monitor / configure features....
 //			, changed "char" to "uint8_t" for clarity.
 //V0.5 WIP voltage for inhibit regen is now more 4.2 but 4.15V (bug report from Janka)
 //V0.6 WIP voltage for inhibit regen is now more 4.09V but 4.09 (MickeyS70 request)
+//V0.5 WIP voltage for inhibit regen is now more 4.2 but 4.15V (bug report from Janka)
+//V0.6 WIP voltage for inhibit regen is now more 4.09V but 4.09 (MickeyS70 request)
+//V0.7 WIP no more voltage mod but temperature -30° to inhibit regen and charge when cold-
+
+

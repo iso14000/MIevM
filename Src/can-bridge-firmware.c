@@ -18,6 +18,7 @@
 //			, changed "char" to "uint8_t" for clarity.
 //V0.5 WIP voltage for inhibit regen is now more 4.2 but 4.15V (bug report from Janka)
 //V0.6 WIP voltage for inhibit regen is now more 4.09V but 4.09 (MickeyS70 request)
+//V0.7 WIP no more voltage mod but temperature -30° to inhibit regen and charge when cold-
 
 //TODO add a busbutton to force SoC2 vs voltage evaluation. (or anything else)
 //TODO => add a Peukert law
@@ -42,7 +43,7 @@
 #define CURRENT_FOR_SOC_VOLTAGE_EVAL 2.0 //in ampere
 #define VOLTAGE_LOWEST	2.75
 #define VOLTAGE_HIGHEST 4.2
-#define	VOLTAGE_FOR_REGEN_DISABLE 4.09
+#define	VOLTAGE_FOR_REGEN_DISABLE 4.2
 
 //long presTime;             //Time in milliseconds
 //float step;                //Current interval
@@ -156,12 +157,13 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 								} else {
 									centiSec = 0;
 								}
-//___________________FSI /!\ just for test ... to test regen inhibition.
+/*___________________FSI /!\ just for test ... to test regen inhibition.
 						if (CommandFlag==REGEN_INHIBIT) 
 						{
 							frame->data[0] = VOLT_TO_CHAR(VOLTAGE_FOR_REGEN_DISABLE);
 						};
-//___________________ END //FSI /!\ just for test ... to test regen inhibition.
+//___________________ END //FSI /!\ just for test ... to test regen inhibition.*/
+								
 						//frame->data[0] = vMax; // FSI => vMax never used elsewhere. 
 						//frame->data[1] = vMin; // FSI => keep original value to handle a potential failure
 				break;
@@ -211,7 +213,14 @@ void can_imiev_handler (uint8_t can_bus, CAN_FRAME *frame) //FSI handler for Imi
 					//filling min temperature array 
 					TempMinCellArray[IndexTemp++]= frame->data[5];
 					if (IndexTemp>7) IndexTemp=0;
-					
+							
+//___________________FSI /!\ just for test ... to test regen inhibition.
+						if (CommandFlag==REGEN_INHIBIT) 
+						{
+							frame->data[5] = 20; //report lowest cell to -30° (50-30 =>20)
+						};
+//___________________ END //FSI /!\ just for test ... to test regen inhibition.					
+							
 					// FSI basic test if 	((frame->data[5])>50)	mLEDON else mLEDOFF;
 				
 				
@@ -275,7 +284,7 @@ float storeSoC2(uint8_t VoltMin) {
 
 void one_second_ping( void )
 {
-    //FSI=> removed legacy prog, but keep function for futur use     
+    //FSI=> removed from legacy prog, but keep function for futur use     
 }
 
 				
@@ -306,7 +315,7 @@ void  StateMachine() //state machine management
 				if (!TestMinTemp(MIN_TEMP)){
 						CommandFlag=REGEN_INHIBIT; // no regen allowed
 						CurrentState=NoRegen; // go to noregen state
-						LedState=LedBlinkOnce;
+						LedState=LedBlinkSlow;
 					}
 				}
 				break;
@@ -318,10 +327,10 @@ void  StateMachine() //state machine management
 				NextEventDelay1ms=1000;//re enter the state in 1s.
 				//action
 				LedState=LedBlinkOnce; //
-				if (TestMinTemp(MIN_TEMP+2)){ //take car of hysteresis
+				if (TestMinTemp(MIN_TEMP+2)){ //take care of hysteresis
 						CommandFlag=NO_ACTION; //  regen allowed
 						CurrentState=NormalRun; // go to normal run
-						LedState=LedBlinkSlow; //
+						LedState=LedBlinkOnce; //
 					}	
 				
 				}
